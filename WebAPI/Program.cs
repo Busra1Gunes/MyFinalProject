@@ -13,7 +13,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IProductService, ProductManager>(); //E?er IProductService ça?r?l?rsa Productmanager gönder
 builder.Services.AddSingleton<IProductDal, EfProductDal>();// E?er IProductDal ça?r?l?rda EfProductDal gönder
-
+//26.01.2024
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
