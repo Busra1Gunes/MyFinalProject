@@ -10,11 +10,12 @@ using System.Threading.Tasks;
 
 namespace Core.Aspects.Autofac.Validation
 {
-    public class ValidationAspect : MethodInterception
+    public class ValidationAspect : MethodInterception//Aspect:Metodun başında, sonunda ve hata verdğnde çalışacak yapı
     {
         private Type _validatorType;
         public ValidationAspect(Type validatorType)
         {
+            //defensive coding
             if (!typeof(IValidator).IsAssignableFrom(validatorType))
             {
                 throw new System.Exception("Bu bir doğrulama sınıfı değildir");
@@ -28,7 +29,7 @@ namespace Core.Aspects.Autofac.Validation
             var entityType = _validatorType.BaseType.GetGenericArguments()[0];
             var entities = invocation.Arguments.Where(t => t.GetType() == entityType);
             foreach (var entity in entities)
-            {
+              {
                 ValidationTool.Validate(validator, entity);
             }
         }

@@ -1,10 +1,13 @@
 ﻿using Business.Abstract;
+using Business.CCS;
 using Business.Constans;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspects.Autofac.Validation;
 using Core.CrossCuttingConcerns.Validation;
+using Core.Utilities.Business;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
+using DataAccess.Concrete.EntityFramework;
 using DataAccess.Concrete.InMemory;
 using Entities.Concrete;
 using Entities.DTOs;
@@ -25,27 +28,24 @@ namespace Business.Concrete
     public class ProductManager : IProductService
     {
         IProductDal _productDal;
-
-        public ProductManager(IProductDal productDal)
+        ICategoryService _categoryService;
+        public ProductManager(IProductDal productDal,ICategoryService categoryService)
         {
             _productDal = productDal;
-        }
-        [ValidationAspect(typeof(ProductValidator))]
-
+            _categoryService = categoryService;
+        } 
+         [ValidationAspect(typeof(ProductValidator))]
         public IResult Add(Product product)
         {
-            //business codes
-            //validation
-            //
-          
-
-            ValidationTool.Validate(new ProductValidator(), product);
-
-
+          IResult result=  BusinessRules.Run(CheckIfProductcountOfCategoryCorrect(product.CategoryID),
+                CheckIfProductNameExists(product.ProductName), CheckIfCategoryLimitExceded());
+            if(result!=null)
+            {
+                return result;
+            }
             _productDal.Add(product);
-            return new SuccessResult(Messages.ProductAdded);
+            return new SuccessResult(Messages.ProductAdded);          
         }
-
         public IDataResult<List<Product>> GetAll()
         {
             if(DateTime.Now.Hour==22)// Hergün saat 22 de sistemi kapatmak istersek
@@ -56,23 +56,18 @@ namespace Business.Concrete
             //Yetkisi var mı
             return new SuccessDataResult<List<Product>>(_productDal.GetAll(),Messages.ProductsListed);
         }
-
         public IDataResult<List<Product>> GetAllByCategoryId(int id)
         {
             return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.CategoryID == id),"Kategori Listelendi");
         }
-
         public IDataResult<Product> GetById(int productId)
         {
             return new SuccessDataResult<Product> (_productDal.Get(p => p.ProductID == productId));
         }
-
         public IDataResult<List<Product>> GetByUnitPrice(decimal min, decimal max)
         {
           return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.UnitPrice >= min && p.UnitPrice <= max));
         }
-
-
         public IDataResult<List<ProductDetailDto>> GetProductDetails()
         {
             if (DateTime.Now.Hour == 11)// Hergün saat 22 de sistemi kapatmak istersek
@@ -81,6 +76,44 @@ namespace Business.Concrete
             }
             return new SuccessDataResult<List<ProductDetailDto>>(_productDal.GetProductDetails());
         }
+        [ValidationAspect(typeof(ProductValidator))]
+        public IResult Update(Product product)
+        {
+            throw new NotImplementedException();
+        }
+        //iş kuralları
+        private IResult CheckIfProductcountOfCategoryCorrect(int categoryId)
+        {
+            //Select count(*) from Products where CategoryID=categoryId
+            var result = _productDal.GetAll(p => p.CategoryID == categoryId).Count;
+            if (result > 15)
+            {
+                return new ErrorResult(Messages.ProductCountOfCategoryError);
 
+            }
+            return new SuccessResult();
+        }
+        private IResult CheckIfProductNameExists(string productname)
+        {
+            
+            var result = _productDal.GetAll(p => p.ProductName.Equals(productname)).Any(); //Any var mı kontrolü yapar
+            if (result)
+            {
+                return new ErrorResult(Messages.ProductNameError);
+
+            }
+            return new SuccessResult();
+        }
+        private IResult CheckIfCategoryLimitExceded()
+        {
+            //Select count(*) from Products where CategoryID=categoryId
+            var result = _categoryService.GetAll();
+            if (result.Data.Count > 15)
+            {
+                return new ErrorResult(Messages.CategoriesLimitedError);
+
+            }
+            return new SuccessResult();
+        }
     }
 }
