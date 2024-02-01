@@ -3,6 +3,7 @@ using Business.BusinessAspects.Autofac;
 using Business.CCS;
 using Business.Constans;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspects.Autofac.Caching;
 using Core.Aspects.Autofac.Validation;
 using Core.CrossCuttingConcerns.Validation;
 using Core.Utilities.Business;
@@ -30,46 +31,49 @@ namespace Business.Concrete
     {
         IProductDal _productDal;
         ICategoryService _categoryService;
-        public ProductManager(IProductDal productDal,ICategoryService categoryService)
+        public ProductManager(IProductDal productDal, ICategoryService categoryService)
         {
             _productDal = productDal;
             _categoryService = categoryService;
         }
         [SecuredOperation("product.add,admin")]
-         [ValidationAspect(typeof(ProductValidator))]
+        [ValidationAspect(typeof(ProductValidator))]
+        [CacheRemoveAspect("IProductService.Get")]
         public IResult Add(Product product)
         {
-          IResult result=  BusinessRules.Run(CheckIfProductcountOfCategoryCorrect(product.CategoryID),
-                CheckIfProductNameExists(product.ProductName), CheckIfCategoryLimitExceded());
-            if(result!=null)
+            IResult result = BusinessRules.Run(CheckIfProductcountOfCategoryCorrect(product.CategoryID),
+                  CheckIfProductNameExists(product.ProductName), CheckIfCategoryLimitExceded());
+            if (result != null)
             {
                 return result;
             }
             _productDal.Add(product);
-            return new SuccessResult(Messages.ProductAdded);          
+            return new SuccessResult(Messages.ProductAdded);
         }
         [CacheAspect] //key,value
         public IDataResult<List<Product>> GetAll()
         {
-            if(DateTime.Now.Hour==22)// Hergün saat 22 de sistemi kapatmak istersek
+            if (DateTime.Now.Hour == 22)// Hergün saat 22 de sistemi kapatmak istersek
             {
                 return new ErrorDataResult<List<Product>>(Messages.MaintenanceTime);
             }
             //İş kodları
             //Yetkisi var mı
-            return new SuccessDataResult<List<Product>>(_productDal.GetAll(),Messages.ProductsListed);
+            return new SuccessDataResult<List<Product>>(_productDal.GetAll(), Messages.ProductsListed);
         }
         public IDataResult<List<Product>> GetAllByCategoryId(int id)
         {
-            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.CategoryID == id),"Kategori Listelendi");
+            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.CategoryID == id), "Kategori Listelendi");
         }
+        [CacheAspect]
+        //[PerformanceAspect(5)]
         public IDataResult<Product> GetById(int productId)
         {
-            return new SuccessDataResult<Product> (_productDal.Get(p => p.ProductID == productId));
+            return new SuccessDataResult<Product>(_productDal.Get(p => p.ProductID == productId));
         }
         public IDataResult<List<Product>> GetByUnitPrice(decimal min, decimal max)
         {
-          return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.UnitPrice >= min && p.UnitPrice <= max));
+            return new SuccessDataResult<List<Product>>(_productDal.GetAll(p => p.UnitPrice >= min && p.UnitPrice <= max));
         }
         public IDataResult<List<ProductDetailDto>> GetProductDetails()
         {
@@ -80,6 +84,7 @@ namespace Business.Concrete
             return new SuccessDataResult<List<ProductDetailDto>>(_productDal.GetProductDetails());
         }
         [ValidationAspect(typeof(ProductValidator))]
+        [CacheRemoveAspect("IProductService.Get")]
         public IResult Update(Product product)
         {
             throw new NotImplementedException();
@@ -98,7 +103,7 @@ namespace Business.Concrete
         }
         private IResult CheckIfProductNameExists(string productname)
         {
-            
+
             var result = _productDal.GetAll(p => p.ProductName.Equals(productname)).Any(); //Any var mı kontrolü yapar
             if (result)
             {
@@ -117,6 +122,19 @@ namespace Business.Concrete
 
             }
             return new SuccessResult();
+        }
+        //[TransactionScopeAspect]
+        public IResult AddTransactional(Product product)
+        {
+            Add(product);
+            if(product.UnitPrice<10)
+            {
+                throw new Exception("");
+
+            }
+            Add(product);
+            return null;
+
         }
     }
 }
