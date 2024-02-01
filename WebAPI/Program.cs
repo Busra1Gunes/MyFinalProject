@@ -3,7 +3,9 @@ using Autofac.Core;
 using Autofac.Extensions.DependencyInjection;
 using Business.Abstract;
 using Business.Concrete;
+using Core.Extensions;
 using Business.DependencyResolvers.Autofac;
+using Core.DependencyResolvers;
 using Core.Utilities.IoC;
 using Core.Utilities.Security.Encryption;
 using Core.Utilities.Security.JWT;
@@ -43,7 +45,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                         IssuerSigningKey = SecurityKeyHelper.CreateSecurityKey(tokenOptions.SecurityKey)
                     };
                 });
-ServiceTool.Create(builder.Services);
+builder.Services.AddDependencyResolvers(new ICoreModule[]
+{
+    new CoreModule()
+});
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -62,3 +70,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+ 
